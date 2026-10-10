@@ -1,6 +1,17 @@
-import { HeadContent, Scripts, createRootRoute } from '@tanstack/react-router'
-import { TanStackRouterDevtoolsPanel } from '@tanstack/react-router-devtools'
-import { TanStackDevtools } from '@tanstack/react-devtools'
+import { 
+  HeadContent, 
+  Scripts, 
+  createRootRoute,
+  Link, 
+} from '@tanstack/react-router'
+
+import { 
+  TanStackRouterDevtoolsPanel, 
+} from '@tanstack/react-router-devtools'
+
+import { 
+  TanStackDevtools, 
+} from '@tanstack/react-devtools'
 
 import appCss from '../styles.css?url'
 
@@ -35,7 +46,21 @@ function RootDocument({ children }: { children: React.ReactNode }) {
         <HeadContent />
       </head>
       <body>
+        <header className="border-b border-gray-200">
+          <nav className="mx-auto max-w-6xl px-4 py-4">
+            <Link to="/" className="text-lg font-semibold">
+              Casas rurales
+            </Link>
+          </nav>
+        </header>
+
         {children}
+
+        <footer className="mt-16 border-t border-gray-200 py-6 text-center text-sm text-gray-500">
+          Laboratorio MetaFrameworks · TanStack Start
+        </footer>
+
+        {/* los devtools y Scripts se quedan como estaban, al final */}
         <TanStackDevtools
           config={{
             position: 'bottom-right',

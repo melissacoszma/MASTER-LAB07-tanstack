@@ -12,6 +12,10 @@ import {
   BookButton,
  } from '#/components/BookButton'
 
+ import {
+  Image,
+ } from '@unpic/react'
+
 const API_URL = import.meta.env.VITE_API_URL ?? 'http://localhost:3001' 
 
 // los parámetros dinámicos se marcan con $ delante, no con corchetes
@@ -30,6 +34,18 @@ export const Route = createFileRoute('/houses/$id')({
 
     return house
   },
+
+  
+  head: ({ loaderData }) => ({
+    meta: [
+      {
+        title: loaderData
+          ? `${loaderData.name} | Casas rurales`
+          : 'Casa rural | Casas rurales',
+      },
+      { name: 'description', content: loaderData?.description ?? '' },
+    ],
+  }),
 
   component: HouseDetail,
 
@@ -62,9 +78,20 @@ function HouseDetail() {
         ← Volver al listado
       </Link>
 
-      <img
+      {/* <img
         src={`${API_URL}${house.image}`}
         alt={`Vista de ${house.name}, en ${house.city}`}
+        className="mt-6 h-80 w-full rounded-xl object-cover"
+      /> */}
+
+      <Image
+        src={`${API_URL}${house.image}`}
+        alt={`Vista de ${house.name}, en ${house.city}`}
+        layout="constrained"
+        width={896}
+        height={320}
+        loading="eager"
+        fetchPriority="high" // priority no lo consume unpic sin CDN y acaba en el DOM provocando error 
         className="mt-6 h-80 w-full rounded-xl object-cover"
       />
 

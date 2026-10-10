@@ -13,7 +13,13 @@ const config = defineConfig({
     devtools(),
     nitro({ rollupConfig: { external: [/^@sentry\//] } }),
     tailwindcss(),
-    tanstackStart(),
+    tanstackStart({
+      prerender: {
+        enabled: true,         // genera HTML estático en tiempo de compilación
+        crawlLinks: true,      // rastrea los enlaces para descubrir más páginas: parte del listado sigue los seis Link de las tarjetas y genera cada ficha
+
+      },
+    }),
     viteReact(),
   ],
 })

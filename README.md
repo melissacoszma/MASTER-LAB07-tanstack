@@ -1,208 +1,164 @@
-Welcome to your new TanStack Start app!
+# Casas rurales — TanStack Start
 
-# Getting Started
+Portal de alquiler vacacional de casas rurales desarrollado con **TanStack Start**,
+TypeScript y Tailwind CSS, como parte del laboratorio de MetaFrameworks del Máster Front End
+de Lemoncode. Es la tercera implementación de la misma aplicación, después de las versiones
+con Next.js y Nuxt, y la que cierra la comparativa entre los tres enfoques. Los datos
+provienen del mock `api-server` del enunciado.
 
-To run this application:
+## La aplicación
 
-```bash
-npm install
-npm run dev
+Dos pantallas. El **listado** muestra el catálogo en una rejilla responsive de tarjetas con
+imagen, ubicación, descripción resumida, capacidad y precio por noche, con un buscador que
+filtra en tiempo real. El **detalle** amplía la ficha con dirección completa, servicios,
+opiniones de huéspedes y un botón de reserva. Ambas conectadas con navegación de cliente.
+
+## Arquitectura
+
+La diferencia más característica de TanStack frente a los otros dos es que **las rutas no
+solo se colocan, se declaran**. Cada archivo de `src/routes/` exporta un objeto `Route`
+creado con `createFileRoute('/ruta')`, y a partir de ahí se genera automáticamente un árbol
+de rutas tipado, `routeTree.gen.ts`.
+
+Eso tiene una consecuencia: los enlaces están comprobados por el compilador. 
+`<Link to="/houses/$id" params={{ id }} />` falla en el editor si esa ruta no existe o si no 
+le pasamos los parámetros que necesita. Durante el desarrollo de este proyecto ocurrió que al 
+añadir parámetros de búsqueda a la ruta `/`, TypeScript señaló de inmediato todos los enlaces 
+de la aplicación que quedaban incompletos, en archivos que ni siquiera estaban abiertos. 
+En Next o Nuxt ese fallo no habría aparecido hasta pinchar el enlace en el navegador.
+
+La carga de datos tampoco vive en el componente, sino en la ruta, mediante un **loader**. El
+router lo ejecuta, espera a que resuelva y solo entonces renderiza, de modo que el componente
+recibe los datos ya listos y correctamente tipados a través de `Route.useLoaderData()`. 
+En la primera visita el loader corre en el servidor; al navegar entre páginas, en el navegador.
+
+El documento HTML se escribe a mano en `src/routes/__root.tsx`, con sus etiquetas `<html>`,
+`<head>` y `<body>` literales. Es el framework que más control da sobre el documento y, en
+consecuencia, el que menos asume por ti.
+
+## Estrategias de rendering
+
+Aquí aparece la diferencia de fondo con los otros dos: **TanStack Start no tiene ISR**. No
+existe un equivalente al `revalidate` de Next ni al `isr` de Nuxt. Las opciones son renderizar
+en servidor en cada petición (que es el comportamiento por defecto) o prerenderizar en tiempo
+de compilación. 
+
+Para un catálogo de seis casas que cambia poco, se ha optado por **prerenderizar la
+aplicación completa**. Se configura en el plugin de Vite, activando el rastreo de enlaces: el
+proceso parte del listado, sigue los enlaces de cada tarjeta y genera una página por casa. Es
+el mismo mecanismo por descubrimiento de Nuxt, pero aquí sí funciona sin ayuda, porque
+el listado también se prerenderiza y sirve de punto de partida.
+
+Salida del `npm run build`:
+
+```
+[prerender] Crawling: /
+[prerender] Crawling: /houses/1
+[prerender] Crawling: /houses/2
+...
+[prerender] Prerendered 7 pages
 ```
 
-# Building For Production
+Y el resultado en disco, bajo `.output/public/`: un `index.html` y una carpeta por cada casa.
+La aplicación entera se sirve como archivos estáticos.
 
-To build this application for production:
+La contrapartida frente a Nuxt es que dar de alta una casa nueva obliga a recompilar,
+mientras que allí el listado se refrescaba solo cada minuto.
 
-```bash
-npm run build
-```
+## Funcionalidades opcionales
 
-## Styling
+**Búsqueda por nombre y ubicación, con el término en la URL.** Es la implementación que más
+se aprovecha de las particularidades del framework. TanStack Router trata los parámetros de
+búsqueda como VIPs, se declaran con `validateSearch`, que los valida y los tipa, y se leen 
+con `useSearch` igual que cualquier otro dato de la ruta. El resultado es que `/?q=granada` 
+es un enlace compartible, el botón de atrás funciona (con `replace` para no apilar una entrada 
+por tecla pulsada) y el estado sobrevive a una recarga.
 
-This project uses [Tailwind CSS](https://tailwindcss.com/) for styling.
+En las versiones de Next y Nuxt la búsqueda se resolvió con estado local del componente,
+porque llevarla a la URL habría convertido la ruta en dinámica y habría costado el rendering
+estático. Aquí no, porque el filtrado sigue ocurriendo en memoria sobre los datos del loader:
+el parámetro de búsqueda no forma parte de las dependencias del loader, así que teclear no
+dispara ninguna petición.
 
-### Removing Tailwind CSS
+**Botón de reserva** en la pantalla de detalle, con confirmación y bloqueo tras el envío.
 
-If you prefer not to use Tailwind CSS:
+**Optimización de imágenes con unpic**, con la particularidad que se detalla más abajo.
 
-1. Remove the demo pages in `src/routes/demo/`
-2. Replace the Tailwind import in `src/styles.css` with your own styles
-3. Remove `tailwindcss()` from the plugins array in `vite.config.ts`
-4. Remove `@tailwindcss/vite` and `tailwindcss` from `package.json`
+## Un poco más
 
-## Linting & Formatting
+Jerarquía de manejo de errores en dos niveles: el router define un `defaultNotFoundComponent`
+y un `defaultErrorComponent` genéricos, y la ruta de detalle los especializa con su propio
+"Casa no encontrada". Metadatos por ruta mediante la opción `head`, que recibe los datos del
+loader y construye el título con el nombre de la casa.
 
+En accesibilidad: HTML semántico, idioma del documento, etiqueta asociada al buscador,
+anuncio de resultados con `aria-live`, equivalente textual para las valoraciones con
+estrellas e indicador de foco visible al navegar con teclado.
 
-This project uses [eslint](https://eslint.org/) and [prettier](https://prettier.io/) for linting and formatting. Eslint is configured using [tanstack/eslint-config](https://tanstack.com/config/latest/docs/eslint). The following scripts are available:
+## Comparativa de los tres frameworks
 
-```bash
-npm run lint
-npm run format
-npm run check
-```
+**Dónde está la frontera entre servidor y cliente.** Next la hace explícita con `"use client"`
+y obliga a decidirla en cada funcionalidad interactiva. Nuxt no la traza: todos sus
+componentes son universales. TanStack tampoco, pero por motivos distintos, su unidad de
+separación no es el componente sino la ruta, y lo que corre en servidor es el loader.
 
+**Dónde se declara el rendering.** Next, en cada página. Nuxt, centralizado en `routeRules`.
+TanStack, en la configuración del plugin de Vite. Y solo los dos primeros ofrecen ISR; el
+tercero elige entre servidor y estático, sin punto intermedio.
 
-## Deploy with Nitro
+**Cómo se averiguan las rutas estáticas.** Next es declarativo, con `generateStaticParams`.
+Nuxt y TanStack trabajan por descubrimiento, rastreando enlaces, con la diferencia de que en
+Nuxt hubo que recurrir a un hook explícito porque el listado era ISR y no servía de punto de
+partida.
 
-This project uses Nitro as a generic server adapter, so it can run on any Node-compatible host.
+**Qué garantiza el tipado.** Aquí TanStack gana sin discusión ya que es el único que comprueba en
+tiempo de compilación que los enlaces apuntan a rutas existentes y que los parámetros de ruta
+y de búsqueda son los correctos.
 
-```bash
-npm run build
-node dist/server/index.mjs
-```
+**Cuánta "ceremonia" exige.** El orden se invierte: Nuxt es el más escueto, con
+auto-importación de componentes y composables y `v-model` para los formularios. Next queda en
+medio. TanStack es el más verboso, porque cada ruta se declara explícitamente.
 
-The build output is a self-contained Node server. To deploy, push the `dist/` directory to your host (Render, Fly.io, your own VPS, etc.) and run the server command above.
+**Optimización de imágenes.** Tres filosofías distintas. Next y Nuxt incluyen su propio
+servidor de optimización —`/_next/image` e `/_ipx/` respectivamente—, y por eso ambos obligan
+a autorizar los dominios de origen. Unpic parte de la idea contraria: no despliega
+infraestructura, solo reescribe URLs de CDNs que reconoce.
 
-For host-specific presets (Vercel, Netlify, Cloudflare, AWS Lambda, etc.) and tuning, see https://v3.nitro.build/deploy.
+**Variables de entorno.** Next inyecta las `NEXT_PUBLIC_` en tiempo de compilación. Nuxt
+resuelve `runtimeConfig` al arrancar el servidor, de modo que el mismo build sirve para
+distintos entornos. TanStack, al apoyarse en Vite, vuelve al modelo de compilación: las
+`VITE_` quedan incrustadas en el bundle, y el propio build lo advierte recordando que en
+producción hay que definirlas como variables de plataforma.
 
+## Decisiones y limitaciones
 
+**Unpic no se activa con el mock.** Al no ser un CDN reconocido, unpic no transforma nada y no
+genera `srcset` ni aplica estilos, y deja pasar las propiedades al elemento. Se ha mantenido
+de todos modos el uso canónico del componente, con su `layout` y sus dimensiones, para que la
+optimización funcione sin tocar código el día que las imágenes estuvieran en un CDN. Mientras
+tanto, los beneficios reales se consiguen con atributos nativos: `width` y `height` reservan
+el espacio y evitan saltos de maquetación, `loading="lazy"` difiere las tarjetas y
+`fetchpriority="high"` prioriza la imagen principal del detalle.
 
-## Routing
+**La reserva es únicamente de interfaz**, porque el mock solo expone dos endpoints `GET`.
 
-This project uses [TanStack Router](https://tanstack.com/router) with file-based routing. Routes are managed as files in `src/routes`.
+**El filtrado ocurre en cliente** sobre los datos ya cargados. Con un catálogo real, la
+búsqueda se resolvería en servidor con paginación, aunque en este caso el término ya está en
+la URL, que era la mitad del problema.
 
-### Adding A Route
+## Conclusión personal
 
-To add a new route to your application just add a new file in the `./src/routes` directory.
+Habiendo implementado la misma aplicación tres veces, me decanto sin duda por **Next.js**. 
+Es el que me ha resultado más manejable e intuitivo con mi nivel: la configuración del rendering 
+vive junto a la página que afecta, la documentación es abundante y la separación explícita entre 
+servidor y cliente, aunque al principio cuesta, acaba siendo una ayuda porque te obliga a tener 
+claro dónde se ejecuta cada cosa. Para este tipo de proyecto y con mi experiencia actual, Next 
+es con el que me he sentido más cómoda trabajando/aprendiendo.
 
-TanStack will automatically generate the content of the route file for you.
+---
 
-Now that you have two routes you can use a `Link` component to navigate between them.
+La aplicación consume el mock `api-server` del enunciado, necesario tanto en desarrollo como
+durante el build, ya que el prerenderizado consulta la API de verdad. Su dirección se
+configura con `VITE_API_URL`; si no se define, se usa `http://localhost:3001`.
 
-### Adding Links
-
-To use SPA (Single Page Application) navigation you will need to import the `Link` component from `@tanstack/react-router`.
-
-```tsx
-import { Link } from "@tanstack/react-router";
-```
-
-Then anywhere in your JSX you can use it like so:
-
-```tsx
-<Link to="/about">About</Link>
-```
-
-This will create a link that will navigate to the `/about` route.
-
-More information on the `Link` component can be found in the [Link documentation](https://tanstack.com/router/v1/docs/framework/react/api/router/linkComponent).
-
-### Using A Layout
-
-In the File Based Routing setup the layout is located in `src/routes/__root.tsx`. Anything you add to the root route will appear in all the routes. The route content will appear in the JSX where you render `{children}` in the `shellComponent`.
-
-Here is an example layout that includes a header:
-
-```tsx
-import { HeadContent, Scripts, createRootRoute } from '@tanstack/react-router'
-
-export const Route = createRootRoute({
-  head: () => ({
-    meta: [
-      { charSet: 'utf-8' },
-      { name: 'viewport', content: 'width=device-width, initial-scale=1' },
-      { title: 'My App' },
-    ],
-  }),
-  shellComponent: ({ children }) => (
-    <html lang="en">
-      <head>
-        <HeadContent />
-      </head>
-      <body>
-        <header>
-          <nav>
-            <Link to="/">Home</Link>
-            <Link to="/about">About</Link>
-          </nav>
-        </header>
-        {children}
-        <Scripts />
-      </body>
-    </html>
-  ),
-})
-```
-
-More information on layouts can be found in the [Layouts documentation](https://tanstack.com/router/latest/docs/framework/react/guide/routing-concepts#layouts).
-
-## Server Functions
-
-TanStack Start provides server functions that allow you to write server-side code that seamlessly integrates with your client components.
-
-```tsx
-import { createServerFn } from '@tanstack/react-start'
-
-const getServerTime = createServerFn({
-  method: 'GET',
-}).handler(async () => {
-  return new Date().toISOString()
-})
-
-// Use in a component
-function MyComponent() {
-  const [time, setTime] = useState('')
-  
-  useEffect(() => {
-    getServerTime().then(setTime)
-  }, [])
-  
-  return <div>Server time: {time}</div>
-}
-```
-
-## API Routes
-
-You can create API routes by using the `server` property in your route definitions:
-
-```tsx
-import { createFileRoute } from '@tanstack/react-router'
-import { json } from '@tanstack/react-start'
-
-export const Route = createFileRoute('/api/hello')({
-  server: {
-    handlers: {
-      GET: () => json({ message: 'Hello, World!' }),
-    },
-  },
-})
-```
-
-## Data Fetching
-
-There are multiple ways to fetch data in your application. You can use TanStack Query to fetch data from a server. But you can also use the `loader` functionality built into TanStack Router to load the data for a route before it's rendered.
-
-For example:
-
-```tsx
-import { createFileRoute } from '@tanstack/react-router'
-
-export const Route = createFileRoute('/people')({
-  loader: async () => {
-    const response = await fetch('https://swapi.dev/api/people')
-    return response.json()
-  },
-  component: PeopleComponent,
-})
-
-function PeopleComponent() {
-  const data = Route.useLoaderData()
-  return (
-    <ul>
-      {data.results.map((person) => (
-        <li key={person.name}>{person.name}</li>
-      ))}
-    </ul>
-  )
-}
-```
-
-Loaders simplify your data fetching logic dramatically. Check out more information in the [Loader documentation](https://tanstack.com/router/latest/docs/framework/react/guide/data-loading#loader-parameters).
-
-
-
-# Learn More
-
-You can learn more about all of the offerings from TanStack in the [TanStack documentation](https://tanstack.com).
-
-For TanStack Start specific documentation, visit [TanStack Start](https://tanstack.com/start).
+Con el mock levantado: `npm install` y `npm run dev`.

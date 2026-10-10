@@ -6,6 +6,10 @@ import type {
     House,
  } from '#/types/house'
 
+ import { 
+  Image,
+ } from '@unpic/react'
+
 const API_URL = import.meta.env.VITE_API_URL ?? 'http://localhost:3001'
 
 interface Props {
@@ -20,9 +24,20 @@ export const HouseCard: React.FC<Props> = ({ house }) => {
       params={{ id: house.id }}
       className="group block overflow-hidden rounded-xl border border-gray-200 bg-white shadow-sm transition hover:shadow-md"
     >
-      <img
+      {/* <img
         src={`${API_URL}${house.image}`}
         alt=""
+        className="h-48 w-full object-cover transition group-hover:scale-105"
+      /> */}
+
+      <Image
+        src={`${API_URL}${house.image}`}
+        alt=""
+        layout="constrained"
+        width={400}
+        height={192}
+        loading="lazy"
+        decoding="async"
         className="h-48 w-full object-cover transition group-hover:scale-105"
       />
 
